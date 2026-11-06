@@ -79,7 +79,7 @@ jobs:
             cd apps/flutter_app/build/macos/Build/Products/Release
             tar -a -cf "$GITHUB_WORKSPACE/dist/remote_link_macos_universal.zip" remote_link.app
           fi
-          ls -la dist/
+          ls -la "$GITHUB_WORKSPACE/dist/"
         shell: bash
 
       - name: Upload artifacts
