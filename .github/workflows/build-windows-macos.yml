@@ -76,10 +76,10 @@ jobs:
             RELEASE_DIR=apps/flutter_app/build/windows/x64/runner/Release
             cp apps/flutter_app/windows/runner/remote_link_core.dll "$RELEASE_DIR/"
             cd "$RELEASE_DIR"
-            zip -r "$GITHUB_WORKSPACE/dist/remote_link_windows_amd64.zip" .
+            tar -a -cf "$GITHUB_WORKSPACE/dist/remote_link_windows_amd64.zip" .
           else
             cd apps/flutter_app/build/macos/Build/Products/Release
-            zip -r "$GITHUB_WORKSPACE/dist/remote_link_macos_universal.zip" RemoteLink.app
+            tar -a -cf "$GITHUB_WORKSPACE/dist/remote_link_macos_universal.zip" RemoteLink.app
           fi
 
       - name: Upload artifacts
