@@ -1,0 +1,70 @@
+name: build-windows-macos
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          rustc --version
+          flutter --version
+        shell: bash
+
+      - name: Build Rust core (FFI native lib)
+        working-directory: apps/flutter_app/rust
+        run: cargo build --release
+        shell: bash
+
+      - name: Copy native lib into Flutter runner
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp apps/flutter_app/rust/target/release/remote_link_core.dll apps/flutter_app/windows/runner/
+          else
+            cp apps/flutter_app/rust/target/release/libremote_link_core.dylib apps/flutter_app/macos/Runner/
+          fi
+
+      - name: Build Flutter release
+        working-directory: apps/flutter_app
+        run: |
+          flutter pub get
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            flutter build windows --release
+          else
+            flutter build macos --release
+          fi
+        shell: bash
+
+      - name: Package artifacts
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cd apps/flutter_app/build/windows/x64/runner/Release
+            zip -r "$GITHUB_WORKSPACE/dist/remote_link_windows_amd64.zip" .
+          else
+            cd apps/flutter_app/build/macos/Build/Products/Release
+            zip -r "$GITHUB_WORKSPACE/dist/remote_link_macos_universal.zip" RemoteLink.app
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote_link_${{ matrix.os }}
+          path: |
+            dist/
+            apps/flutter_app/build/windows/x64/runner/Release/
+            apps/flutter_app/build/macos/Build/Products/Release/RemoteLink.app
+          if-no-files-found: warn
