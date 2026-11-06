@@ -1,0 +1,15 @@
+[package]
+name = "rl-signaling-qq-official"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+rl-protocol = { path = "../../core/protocol" }
+rl-signaling = { path = "../../core/signaling" }
+async-trait = "0.1"
+uuid.workspace = true
