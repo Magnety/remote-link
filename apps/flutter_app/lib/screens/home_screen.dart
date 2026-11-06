@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -23,7 +24,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppState>().refreshDevices();
+      final s = context.read<AppState>();
+      s.refreshDevices();
+      // 自动启动信令总线 (QQ 群互传)
+      if (!s.busRunning && s.signaling != null && s.selfDevice != null) {
+        s.startSignaling();
+      }
     });
   }
 
@@ -97,6 +103,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const Divider(height: 1),
+                // 信令总线状态条
+                _SignalingBar(state: state),
                 // 当前设备卡片
                 if (self != null)
                   Padding(
@@ -542,6 +550,92 @@ class _StatusPill extends StatelessWidget {
               decoration: BoxDecoration(color: status.dot, shape: BoxShape.circle)),
           const SizedBox(width: 4),
           Text(status.label, style: TextStyle(fontSize: 11, color: status.dot)),
+        ],
+      ),
+    );
+  }
+}
+/// 信令总线状态条：显示 QQ 群连接状态，可启动/停止
+class _SignalingBar extends StatefulWidget {
+  final AppState state;
+  const _SignalingBar({required this.state});
+
+  @override
+  State<_SignalingBar> createState() => _SignalingBarState();
+}
+
+class _SignalingBarState extends State<_SignalingBar> {
+  final List<String> _logs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = widget.state.busLog.listen((l) {
+      setState(() {
+        _logs.add(l);
+        if (_logs.length > 50) _logs.removeRange(0, _logs.length - 50);
+      });
+    });
+  }
+
+  StreamSubscription<String>? _sub;
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final theme = Theme.of(context);
+    final adapterLabel = state.signaling?.adapterType.label ?? '未配置';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: state.busConnected
+                  ? Colors.greenAccent
+                  : (state.busRunning ? Colors.amber : Colors.grey),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'QQ 群信令: $adapterLabel · '
+                  '${state.busConnected ? '已连接' : (state.busRunning ? '连接中…' : '未启动')}',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+                if (_logs.isNotEmpty)
+                  Text(
+                    _logs.last,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonal(
+            onPressed: state.busRunning
+                ? () => state.stopSignaling()
+                : () => state.startSignaling(),
+            child: Text(state.busRunning ? '停止信令' : '启动信令'),
+          ),
         ],
       ),
     );

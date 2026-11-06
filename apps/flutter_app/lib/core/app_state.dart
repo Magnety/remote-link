@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'models.dart';
 import 'rust_bridge.dart';
+import 'signaling_bus.dart';
 
 /// 应用主路由
 enum AppRoute { welcome, setup, pairing, home }
@@ -40,6 +41,13 @@ class AppState extends ChangeNotifier {
   // 设置
   AppSettings _settings = AppSettings();
   AppSettings get settings => _settings;
+
+  // 信令总线 (QQ 群互传)
+  final SignalingBus _bus = SignalingBus();
+  bool _busRunning = false;
+  bool get busRunning => _busRunning;
+  bool _busConnected = false;
+  bool get busConnected => _busConnected;
 
   AppState({required this.rustAvailable}) : _rust = RustBridge() {
     _rust.init();
@@ -290,6 +298,82 @@ class AppState extends ChangeNotifier {
   Future<void> updateSettings(AppSettings s) async {
     _settings = s;
     await _persist();
+    notifyListeners();
+  }
+
+  // ---------- 信令总线 (QQ 群互传) ----------
+
+  Stream<String> get busLog => _bus.onLog;
+
+  /// 启动信令总线：连接本机绑定的 QQ 机器人 (OneBot WS) 或 Mock
+  Future<void> startSignaling() async {
+    final sig = _signaling;
+    final self = _selfDevice;
+    if (sig == null || self == null || _busRunning) return;
+    _busRunning = true;
+    notifyListeners();
+    _bus.onStatus.listen((c) {
+      _busConnected = c;
+      notifyListeners();
+    });
+    _bus.onMessage.listen(_onBusMessage);
+    try {
+      await _bus.start(sig,
+          selfDeviceId: self.deviceId,
+          selfDeviceName: self.deviceName,
+          groupId: self.groupId);
+    } catch (e) {
+      debugPrint('bus start error: $e');
+    }
+  }
+
+  void _onBusMessage(String rlJson) {
+    try {
+      final j = jsonDecode(rlJson) as Map<String, dynamic>;
+      final type = (j['message_type'] ?? '').toString();
+      final sender = (j['sender_device_id'] ?? '').toString();
+      final name = (j['payload'] != null
+          ? (jsonDecode(j['payload'] as String)['device_name'] ?? '')
+          : '') as String;
+      if (sender == _selfDevice?.deviceId) return;
+      switch (type) {
+        case 'DEVICE_ONLINE':
+        case 'DEVICE_HEARTBEAT':
+          final idx = _devices.indexWhere((d) => d.deviceId == sender);
+          final dev = Device(
+            deviceId: sender,
+            deviceName: name.isNotEmpty ? name : '设备 $sender',
+            platform: Platform.linux,
+            groupId: _selfDevice!.groupId,
+            status: DeviceStatus.online,
+            lastSeen: DateTime.now(),
+            isTrusted: idx >= 0 ? _devices[idx].isTrusted : false,
+          );
+          if (idx >= 0) {
+            _devices[idx] = dev;
+          } else {
+            _devices.add(dev);
+          }
+          notifyListeners();
+          break;
+        case 'DEVICE_OFFLINE':
+          final i2 = _devices.indexWhere((d) => d.deviceId == sender);
+          if (i2 >= 0 && !_devices[i2].isSelf) _devices.removeAt(i2);
+          notifyListeners();
+          break;
+        default:
+          // CONNECT_REQUEST / SDP / ICE 等留给会话层
+          break;
+      }
+    } catch (_) {}
+  }
+
+  /// 停止信令总线
+  Future<void> stopSignaling() async {
+    if (!_busRunning) return;
+    await _bus.stop();
+    _busRunning = false;
+    _busConnected = false;
     notifyListeners();
   }
 

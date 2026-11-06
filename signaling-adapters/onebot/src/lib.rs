@@ -33,6 +33,8 @@ struct OneBotMessage {
     message: Vec<OneBotSegment>,
     #[serde(default)]
     self_id: i64,
+    #[serde(default)]
+    sender_id: i64,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
@@ -76,18 +78,21 @@ impl OneBotSignaling {
         if msg.post_type != "message" {
             return None;
         }
-        // 只处理群消息
-        if msg.message_type != "group" && msg.group_id != self.group_id {
+        // 只处理群消息（group_id=0 表示未配置，放行）
+        if msg.message_type != "group" && self.group_id != 0 && msg.group_id != self.group_id {
             return None;
         }
-        // 提取文本
-        let text = msg.message.iter().find_map(|seg| {
+        // 提取全部文本段（一条群消息可能由多个 text 段组成，QQ 会按长度拆段）
+        let text: String = msg.message.iter().filter_map(|seg| {
             if seg.seg_type == "text" {
                 seg.data.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
             } else {
                 None
             }
-        })?;
+        }).collect();
+        if text.is_empty() {
+            return None;
+        }
         // 尝试解析 RemoteLink 信令
         let signaling = SignalingMessage::from_json(&text).ok()?;
         Some(ReceivedMessage {
