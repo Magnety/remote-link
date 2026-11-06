@@ -35,16 +35,25 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
+          set +e
           if [ "$RUNNER_OS" = "Windows" ]; then
-            DLL=$(find target/release apps/flutter_app/rust/target/release -name "remote_link_core.dll" 2>/dev/null | head -1)
-            echo "using DLL: $DLL"
-            [ -n "$DLL" ] || { echo "DLL not found"; ls -R target/release 2>/dev/null | head; exit 1; }
+            DLL=$(find . -path ./apps/flutter_app/build -prune -o -name "remote_link_core.dll" -print 2>/dev/null | head -1)
+          else
+            DLL=$(find . -path ./apps/flutter_app/build -prune -o -name "libremote_link_core.dylib" -print 2>/dev/null | head -1)
+          fi
+          set -e
+          echo "using: $DLL"
+          if [ -z "$DLL" ]; then
+            echo "NOT FOUND — searching manually:"
+            find . -name "remote_link_core.dll" -o -name "libremote_link_core.dylib" | head
+            ls -la apps/flutter_app/rust/target/release/ 2>/dev/null | head
+            ls -la target/release/ 2>/dev/null | head
+            exit 1
+          fi
+          if [ "$RUNNER_OS" = "Windows" ]; then
             cp "$DLL" apps/flutter_app/windows/runner/
           else
-            DYLIB=$(find target/release apps/flutter_app/rust/target/release -name "libremote_link_core.dylib" 2>/dev/null | head -1)
-            echo "using DYLIB: $DYLIB"
-            [ -n "$DYLIB" ] || { echo "DYLIB not found"; ls -R target/release 2>/dev/null | head; exit 1; }
-            cp "$DYLIB" apps/flutter_app/macos/Runner/
+            cp "$DLL" apps/flutter_app/macos/Runner/
           fi
 
       - name: Build Flutter release
