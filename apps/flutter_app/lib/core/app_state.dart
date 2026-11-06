@@ -41,7 +41,9 @@ class AppState extends ChangeNotifier {
   AppSettings _settings = AppSettings();
   AppSettings get settings => _settings;
 
-  AppState({required this.rustAvailable}) : _rust = RustBridge();
+  AppState({required this.rustAvailable}) : _rust = RustBridge() {
+    _rust.init();
+  }
 
   /// 启动引导
   Future<void> bootstrap() async {
@@ -64,6 +66,7 @@ class AppState extends ChangeNotifier {
 
   void _setRoute(AppRoute r) {
     _route = r;
+    notifyListeners();
   }
 
   // ---------- 持久化 ----------

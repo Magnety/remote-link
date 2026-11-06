@@ -176,7 +176,7 @@ class _RemoteDesktopScreenState extends State<RemoteDesktopScreen>
             showKeyboard: _showKeyboard,
             quality: _quality,
             onToggleKeyboard: () => setState(() => _showKeyboard = !_showKeyboard),
-            onQuality: (q) => setState(() => _quality = q),
+            onQuality: (q) => setState(() { if (q != null) _quality = q; }),
             onClipboard: () => _toast(context, '剪贴板已同步'),
             onFile: () => _toast(context, '文件传输（演示）'),
             onMonitor: () => _toast(context, '切换显示器（演示）'),
