@@ -33,11 +33,18 @@ jobs:
 
       - name: Copy native lib into Flutter runner
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cp apps/flutter_app/rust/target/release/remote_link_core.dll apps/flutter_app/windows/runner/
+            DLL=$(find target/release apps/flutter_app/rust/target/release -name "remote_link_core.dll" 2>/dev/null | head -1)
+            echo "using DLL: $DLL"
+            [ -n "$DLL" ] || { echo "DLL not found"; ls -R target/release 2>/dev/null | head; exit 1; }
+            cp "$DLL" apps/flutter_app/windows/runner/
           else
-            cp apps/flutter_app/rust/target/release/libremote_link_core.dylib apps/flutter_app/macos/Runner/
+            DYLIB=$(find target/release apps/flutter_app/rust/target/release -name "libremote_link_core.dylib" 2>/dev/null | head -1)
+            echo "using DYLIB: $DYLIB"
+            [ -n "$DYLIB" ] || { echo "DYLIB not found"; ls -R target/release 2>/dev/null | head; exit 1; }
+            cp "$DYLIB" apps/flutter_app/macos/Runner/
           fi
 
       - name: Build Flutter release
@@ -57,7 +64,9 @@ jobs:
         run: |
           mkdir -p dist
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cd apps/flutter_app/build/windows/x64/runner/Release
+            RELEASE_DIR=apps/flutter_app/build/windows/x64/runner/Release
+            cp apps/flutter_app/windows/runner/remote_link_core.dll "$RELEASE_DIR/"
+            cd "$RELEASE_DIR"
             zip -r "$GITHUB_WORKSPACE/dist/remote_link_windows_amd64.zip" .
           else
             cd apps/flutter_app/build/macos/Build/Products/Release
