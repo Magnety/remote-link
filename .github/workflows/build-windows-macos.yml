@@ -68,19 +68,19 @@ jobs:
         shell: bash
 
       - name: Package artifacts
-        shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           mkdir -p dist
           if [ "$RUNNER_OS" = "Windows" ]; then
             RELEASE_DIR=apps/flutter_app/build/windows/x64/runner/Release
             cp apps/flutter_app/windows/runner/remote_link_core.dll "$RELEASE_DIR/"
-            cd "$RELEASE_DIR"
-            tar -a -cf "$GITHUB_WORKSPACE/dist/remote_link_windows_amd64.zip" .
+            powershell -NoProfile -Command "Compress-Archive -Path '$RELEASE_DIR/*' -DestinationPath '$GITHUB_WORKSPACE/dist/remote_link_windows_amd64.zip' -Force"
           else
             cd apps/flutter_app/build/macos/Build/Products/Release
-            tar -a -cf "$GITHUB_WORKSPACE/dist/remote_link_macos_universal.zip" RemoteLink.app
+            tar -a -cf "$GITHUB_WORKSPACE/dist/remote_link_macos_universal.zip" remote_link.app
           fi
+          ls -la dist/
+        shell: bash
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -89,5 +89,5 @@ jobs:
           path: |
             dist/
             apps/flutter_app/build/windows/x64/runner/Release/
-            apps/flutter_app/build/macos/Build/Products/Release/RemoteLink.app
+            apps/flutter_app/build/macos/Build/Products/Release/remote_link.app
           if-no-files-found: warn
